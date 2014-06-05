@@ -1,6 +1,6 @@
 # feuilles.editor.js 
 
-Here's the JS engine that powers Feuilles' editor. It's dirty. It's not refactored. But here its is. Brutally.
+Here's the JS engine that powers [Feuilles](https://feuill.es)' editor. It's dirty. It's not refactored. But here it is. Brutally.
 
 
 ## A Note
@@ -53,7 +53,7 @@ Feel free to suggest new libraries.
 
 * In `feuilles.editor.js`, look at the `init()` method. This method will init sub-modules (which are located in `feuilles.editor.write.js` and `feuilles.editor.conv.js`).
 * In `feuilles.editor.write.js`, you will find everything that is related to the *actual* editor. We focus a lot on keys, especially on `enter` and `backspace`, so we can take control of what browsers do.
-* In `feuilles.editor.conv.js`, you will find everything that is related to conversations. Since conversations are embedded in Feuilles documents, we also alter the actual document's content (but only the parts that have to deal with conversations). Anything that is not related to conversations is not placed in this file.
+* In `feuilles.editor.conv.js`, you will find everything that is related to [conversations](https://github.com/feuilles/Editor/blob/gh-pages/CONVERSATIONS.md). Since conversations are embedded in Feuilles documents, we also alter in here the actual document's content (but only the parts that have to deal with conversations). Anything that is not related to conversations is not placed in this file.
 * In `feuilles.editor.util.js`, you will find a few helpers. You will certainly be interested in the `parseContent()` method, which is called by `editor.write.save()` to transform the markup produced by the editor into data that is server-compliant.
 * The `feuilles.editor.js` contains a few wrappers to make the public API somehow friendlier. It also contains `config` variables.
 
