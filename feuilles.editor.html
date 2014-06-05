@@ -1,0 +1,178 @@
+
+<div class="container-full feuilles-editor-container" data-js-on="show" style="display:none;">
+	<div class="row">
+		
+		<!--
+		============================= Write pane =============================
+		-->	
+		<div class="writer-col">
+			<div class="feuilles-write-container">
+				<div class="feuilles-write">
+					<h1 class="feuilles-editor feuilles-editor-inline" data-feuilles-write="inline" data-editor-grab="true" data-field-name="title" {{#doc.editable}}contenteditable="true"{{/doc.editable}}>{{doc.title}}</h1>
+					{{^doc.editable}}
+					<p class="center"><span class="highlight">Read only</span></p>
+					{{/doc.editable}}
+			
+					{{#doc.is_published}}
+					<p class="center published" data-js-on="show">
+						<a href="#">PUBLISHED</a>
+					</p>
+					
+					<ul class="published-list list list-unstyled center" data-js-on="hide">
+						{{#doc.published.github}}
+						<li>
+							<strong>On GitHub:</strong> <span class="publish-link"><a href="{{github.url}}" target="_github">{{github.url}}</a></span>
+						</li>
+						{{/doc.published.github}}
+						
+						{{#doc.published.wordpress}}
+						<li>
+							<strong>On WordPress:</strong> <span class="publish-link"><a href="{{wordpress.url}}" target="_wordpress">{{wordpress.url}}</a></span>
+						</li>
+						{{/doc.published.wordpress}}
+						
+						{{#doc.published.dropbox}}
+						<li>
+							<strong>On Dropbox:</strong> <span class="publish-link"><a href="{{dropbox.url}}" target="_dropbox">{{dropbox.url}}</a></span>
+						</li>
+						{{/doc.published.dropbox}}
+					</ul>
+					{{/doc.is_published}}
+					
+					<div id="the-editor" class="feuilles-editor feuilles-editor-multiline" data-feuilles-write="multiline" data-editor-grab="true" data-field-name="body" {{#doc.editable}}data-feuilles-focus="true" contenteditable="true"{{/doc.editable}}>{{doc.content}}</div>
+
+
+<pre id="editor-placeholder" style="display:none;">{{doc.content}}</pre>
+
+				</div>
+			</div>
+		</div>
+		
+		<!--
+		============================= Conversations pane =============================
+		-->	
+		<div class="conversations-col">
+			<div class="conversations" style="display:none;">
+				
+				<div class="clearfix">
+					<p class="hide-conversations-pane align-right pull-right">
+						<button class="btn btn-link btn-close-conversations-pane btn-tooltip" data-toggle="tooltip" data-placement="bottom" title="Close pane">
+							<span class="icon">&#10060;</span> <span class="visuallyhidden">Close</span>
+						</button>
+					</p>
+					<p class="pull-right start-conv-container">
+						<button class="btn btn-link btn-start-conversation btn-tooltip" data-toggle="tooltip" data-placement="bottom" title="New conversation">
+							<span class="icon">&#59168;</span> <span class="visuallyhidden">Converse</span>
+						</button>
+					</p>
+
+					<p class="pull-right delete-conv-container">
+						<button class="btn btn-link btn-delete-conversation btn-tooltip" data-toggle="tooltip" data-placement="bottom" title="Delete selected">
+							<span class="icon">&#59177;</span> <span class="visuallyhidden">Delete</span>
+						</button>
+					</p>
+				</div>
+				<!--
+				<div class="clearfix">
+					<p class="pull-left start-conv-container">
+						<button class="btn btn-link btn-start-conversation"><span class="icon">&#59168;</span></button>
+					</p>
+
+					<p class="pull-right delete-conv-container">
+						<button class="btn btn-link btn-delete-conversation"><span class="icon">&#59177;</span></button>
+					</p>
+				</div>
+				-->
+				<h3 class="conversing-about center" style="display:none;">Conversations</h3>
+		
+				<div class="conversation-container">
+					<p id="conversation-reference" class="conversation-reference"></p>
+					<div class="conversation-input">
+						<form method="post" name="converse" class="form form-write" action="{{urls.api.doc.update}}">
+							<input type="hidden" name="{{csrf_key}}" value="{{csrf_token}}">
+							<input type="hidden" name="request_origin" value="{{request_origin}}">
+							<input type="hidden" name="sha" value="{{doc.sha}}">
+							<div class="input-group">
+							<input id="say_it" type="text" class="form-control" name="say_it" placeHolder="Your reflections go here">
+							<span class="input-group-btn">
+								<button class="btn btn-default"><span class="icon">&#10133;</span><span class="visuallyhidden">Say it</span></button>
+							</span>
+							</div>
+						</form>
+					</div>
+					
+					<p id="conversation-none" class="conversation-none stand-out" style="display:none;">
+						Nothing has been said yet
+					</p>
+					
+					<p id="conversation-empty" class="conversation-empty stand-out" style="display:none;">
+						There is currently no conversation
+					</p>
+					
+					<div class="conversation-texts">
+						<div class="conversation-items">
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>	
+	
+	<!--
+	============================= Stores data, acts like hidden fields =============================
+	-->	
+	<ul data-hidden-fields="doc_editor" style="display:none">
+		<li data-name="request_origin" data-value="{{request_origin}}"></li>
+		<li data-name="sha" data-value="{{doc.sha}}"></li>
+	</ul>
+	
+	<!--
+	============================= Template: specific conversation =============================
+	-->	
+	<div id="conversation-template" style="display:none">
+		<div class="conversation-item">
+			<div class="row">
+				<div class="col-md-4">
+					<p class="conversation-username"></p>
+					<p class="conversation-nicedate highlight"></p>
+				</div>
+				
+				<div class="col-md-8">
+					<p class="conversation-new-reference" style="display:none"></p>
+					<p class="conversation-content"></p>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!--
+	============================= Template: all conversations =============================
+	-->	
+	
+	<div id="conversation-all-template" style="display:none">
+		<div class="conversation-all-item">
+			<div class="conversation-all-ref-wrapper">
+				<p class="conversation-all-ref"></p>
+			</div>
+		</div>
+	</div>
+	
+	<!--
+	============================= Modal: confirm delete =============================
+	-->	
+	
+	<div id="sure" style="display:none">
+		<p class="stand-out">Are you sure you want to delete this conversation?</p>
+		
+		<ul class="list list-inline center">
+			<li>
+				<button class="btn btn-success delete-conv-nope">Nope</button>
+			</li>
+			<li>
+				<button class="btn btn-danger delete-conv-yep">Yep</button>
+			</li>
+		</ul>
+	</div>
+
+</div>
+<a href="https://github.com/you"><img style="position: absolute; top: 90px; left: 0; border: 0;" src="https://camo.githubusercontent.com/567c3a48d796e2fc06ea80409cc9dd82bf714434/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f6c6566745f6461726b626c75655f3132313632312e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_left_darkblue_121621.png"></a>

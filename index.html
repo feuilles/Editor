@@ -1,0 +1,103 @@
+<!doctype html>
+	<html lang="en" class="">
+  	<head>
+	    <meta charset="utf-8">
+	    <title>Editor – Feuilles</title>
+	    <meta name="viewport" content="width=device-width, initial-scale=1">
+	    <meta name="author" content="@alexduloz">
+	    <link rel="stylesheet" href="./env/fonts/entypo/entypo.css">
+	    <link rel="stylesheet" href="./env/min.css">
+	    <link rel="stylesheet" href="./css/feuilles.editor.css">
+	    <link rel="stylesheet" href="./css/feuilles.ephemeral.css">
+  	</head>
+  	<body class="desktop console-env logged-in">
+	  	<div id="loaded" style="">
+			<div class="console-nav clearfix">
+				<ul class="list-inline console-nav-left pull-left">
+					
+					<li class="console-nav-icon">
+						<a href="#" class="btn-account">
+							<span class="icon">&#9881;</span>
+						</a>
+					</li>
+						
+					<li class="console-nav-icon">
+						<a href="#" class="">
+							<span class="icon">&#59201;</span>
+						</a>
+					</li>
+					<li>
+						<a href="#" class="">
+							Your documents
+						</a>
+					</li>
+					<li class="nav-spin" style="display:none"></li>
+				</ul>
+
+				<ul class="list-inline pull-right">
+					<li>
+						<a href="#" class="">
+							Import
+						</a>
+					</li>
+					
+					<li>
+						<a href="#" class="">
+							Publish
+						</a>
+					</li>
+
+					<li>
+						<a href="#" class="">
+							Clients
+						</a>
+					</li>
+
+					<li>
+						<a href="#" class="">
+							Apps
+						</a>
+					</li>
+				</ul>
+			</div>
+
+			<div class="main clearfix" id="main" role="main">
+				<div class="sub-nav sub-nav-write">
+					<ul class="list-inline">
+						<li>
+							<button id="toggle-conversation" class="btn btn-link btn-tooltip" data-toggle="tooltip" data-placement="bottom" title="Toggle Conversations">
+								<span class="icon">&#59160;</span>
+							</button>
+						</li>
+					</ul>
+				</div>
+
+				<div id="feuilles-editor"></div>
+			</div>
+		</div>
+
+		<div id="notification">
+			<p></p>
+		</div>
+
+		<div class="modal fade editor-modal" tabindex="-1" role="dialog" aria-hidden="true">
+		   	<div class="modal-dialog modal-sm">
+		      	<button class="btn btn-link editor-modal-close">
+		      		<span class="icon">&#10060;</span>
+		      	</button>
+		      	<div class="modal-content"></div>
+		    </div>
+		</div>
+
+		<script src="./env/jquery.min.js"></script>
+		<script src="./env/mustache.js"></script>
+		<script src="./js/feuilles.editor.js"></script>
+		<script src="./js/feuilles.editor.util.js"></script>
+		<script src="./js/feuilles.editor.core.js"></script>
+		<script src="./js/feuilles.editor.writer.js"></script>
+		<script src="./js/feuilles.editor.conv.js"></script>
+		<script src="./env/loaded.public.js"></script>
+		<script src="./env/loaded.console.js"></script>
+		<script src="./index.js"></script>
+  	</body>
+</html>
