@@ -8,4 +8,4 @@
 
 ## v0.1.0
 
-Initial real ease. Dirty. Smelly.
+Initial realease.
