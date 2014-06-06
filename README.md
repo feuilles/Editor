@@ -83,6 +83,14 @@ At the moment, it's not possible to simply grab the editor and run it on your ow
 
 However, I plan to abstract the editor in a way that makes it easy to plug it into your own projects.
 
+## ChangeLog
+
+### v0.1.1
+
+* Added comments
+* Refactored, cleaned portions of code
+* Took better control of <kb>enter</kbd> and <kb>backspace</kbd>
+
 ## Cheers
 
 @alexduloz

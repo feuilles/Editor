@@ -1,7 +1,15 @@
+/*!
+ * FeuillesEditor (https://github.com/feuilles/Editor)
+ * Copyright 2014 Alex Duloz
+ * Licensed under MIT (https://github.com/feuilles/Editor/blob/gh-pages/LICENSE)
+ */
 (function() {
 
-	var util = editor.util;
-
+	/**
+	 *
+	 * Init Writer
+	 *
+	 */
 	var self = editor.writer = {};
 
 	/**
@@ -15,7 +23,9 @@
 		//
 		// Empty paragraphs are ignored in the flow
 		// of focus with the kbd.
-		// Attempt to fix that.
+		// Attempt to fix that by catching
+		// "navigational" keys.
+		// @see editor.writer.focus
 		//
 		kDown.whenDown("up", function(e) {
 			editor.writer.focus.up(e);
@@ -33,19 +43,30 @@
 			editor.writer.focus.right(e);
 		});
 
+		//
+		// Turn [data-empty="true"] nodes
+		// to [data-empty="false"] if something
+		// is typed.
+		//
 		document.addEventListener("keydown", function(e) {
-
-			var realTarget = editor.util.getTarget();
-			if (!realTarget) {
+			//
+			// Get our target node.
+			// e.target doesn't work as expected
+			// in contenteditable contexts.
+			// We rely on .getTarget();
+			// @see feuilles.editor.util.js#getTarget
+			//
+			var target = editor.util.getTarget();
+			if (!target) {
 				return;
 			}
+			var $target = $(target);
+			var targetHTML = editor.util.noBr($.trim($target.html()));
 
-			var $target = $(realTarget);
-
-			var targetHTML = $.trim($target.html());
-
-			targetHTML = editor.util.noBr(targetHTML);
-
+			//
+			// "true" to "false" if something
+			// is typed.
+			//
 			if ($target.attr("data-empty") === "true" && targetHTML !== "" && targetHTML !== "&nbsp;") {
 				$target.attr("data-empty", "false");
 			}
@@ -53,391 +74,548 @@
 		}, false);
 
 		//
-		// Prevent line jumps in contenteditable
-		// inline areas
+		// Handle the "enter" key in
+		// contenteditable contexts.
 		//
 		kDown.whenDown("enter", function(e) {
 			self.on.enter(e);
 		});
 
+		//
+		// Handle the "backspace" key in
+		// contenteditable contexts.
+		//
 		kDown.whenDown("backspace", function(e) {
 			self.on.backspace(e);
 		});
 
-		self.makeContent($("#the-editor").html());
+		//
+		// Grab the raw content displayed in
+		// the contenteditable area and
+		// make it a bit fancier.
+		//
+		$theEditor = $("#the-editor");
+		var content = editor.util.makeContent($theEditor.html());
+		$theEditor.html(content);
 
+		//
+		// Callback (if any)
+		//
 		callback();
 	};
 
 	/**
 	 *
-	 * This is where we translate our raw content
-	 * into an editor, HTML-ish, rich content
+	 * Take control of "navigational" keys.
+	 * If we don't do that, using "up" and "down",
+	 * for example, will make the caret jump from
+	 * '[data-empty="false"]' to '[data-empty="false"]'
+	 * nodes, ignoring '[data-empty="true"]' nodes.
+	 *
+	 * Empty nodes don't "catch focus", which makes
+	 * for strange, hunge jumps if you have a lot
+	 * of empty lines.
 	 *
 	 */
-	editor.writer.makeContent = function(content) {
-		
-		// console.log(content);
-
-		//
-		// Highlight refs
-		//
-		content = content.replace(/{ref for=([\s\S]*?)}([\s\S]*?){\/ref}/g, '<span class="conversation-highlight" data-ref-for="$1">$2</span>', content);
-
-		//
-		// Hide embedded conversations
-		//
-		//content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, '<div class="embedded-conversation" style="display:none;" data-conversation-id="$1">$2<\/div>');
-		var conv = content.match(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g);
-		content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, "");
-
-		var br = content.split(/(?:\r\n|\r|\n)/g);
-
-		if (br) {
-			var lineByLine = "";
-			for (var j = 0; j < br.length; j++) {
-				if ($.trim(br[j]) === "") {
-					lineByLine += '<div data-editor="token" data-token="p" data-empty="true"></div>';
-				} else {
-					lineByLine += '<div data-editor="token" data-token="p">' + br[j] + "</div>";
-				}
-
-				content = lineByLine;
-
-			};
-		} else {
-			content = '<div data-editor="token" data-token="p">' + content + '</div>';
-		}
-
-
-
-		/*
-		//
-		// Highlight refs
-		//
-		content = content.replace(/{ref for=([\s\S]*?)}([\s\S]*?){\/ref}/g, '<span class="conversation-highlight" data-ref-for="$1">$2</span>', content);
-
-		//
-		// Hide embedded conversations
-		//
-		content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, '<div class="embedded-conversation" style="display:none;" data-conversation-id="$1">$2<\/div>');
-		*/
-
-		//
-		// Preserve conversations from tokenization
-		//
-		/*
-		var div = document.createElement("div");
-		div.innerHTML = content;
-
-		$(div).find('[data-editor="token"]').each(function(){
-
-			console.log(this);
-
-			if ($(this).closest(".embedded-conversation").length) {
-				$(this).remove();
-			}
-		});
-		/*
-		var div = document.createElement("div");
-		div.innerHTML = content;
-		$(div).find(".embedded-conversation").each(function() {
-			$(this).find('[data-editor="token"]').remove();
-		});
-		*/
-		//content = $(div).html();
-
-		if (conv) {
-			for (var i = 0; i < conv.length; i++) {
-				content += conv[i].replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, '\n\n<div class="embedded-conversation" style="display:none;" data-conversation-id="$1">$2<\/div>');
-				//content += conv[i]
-			};
-		}
-
-		//console.log(content);
-
-		$('[data-feuilles-write="multiline"]').html(content);
-	};
-
 	editor.writer.focus = {
+		//
+		// The "up" key
+		//
 		"up": function(e) {
+			//
+			// Get a "contenteditable" target
+			// (e.target is not reliable)
+			//
 			var target = editor.util.getTarget();
-
 			if (!target) {
 				return;
 			}
 
+			//
+			// Are using the "up" key in
+			// the editor?
+			//
 			var $target = $(target);
-
 			if (!$target.closest(".feuilles-editor").length) {
 				return;
 			}
 
+			//
+			// Is there a "previous" node?
+			//
 			var $prev = $target.prev();
-
 			if (!$prev.length) {
 				return;
 			}
 
+			//
+			// Is the "previous" node a
+			// [data-empty="true"] type of node?
+			//
 			if ($prev.attr("data-empty") !== "true") {
 				return;
 			}
+
 			//
-			// In the editor + prev empty node
-			// take control of the event
+			// Time to take control of the event.
 			//
 			e.preventDefault();
 
+			//
+			// Set caret at the beginning of
+			// the empty node.
+			//
 			editor.util.focus($prev[0]);
 
 		},
 
+		//
+		// The "down" key
+		//
 		"down": function(e) {
+			//
+			// Get a "contenteditable" target
+			// (e.target is not reliable)
+			//
 			var target = editor.util.getTarget();
-
 			if (!target) {
 				return;
 			}
 
+			//
+			// Are using the "down" key in
+			// the editor?
+			//
 			var $target = $(target);
-
 			if (!$target.closest(".feuilles-editor").length) {
 				return;
 			}
 
+			//
+			// Is there a "next" node?
+			//
 			var $next = $target.next();
-
 			if (!$next.length) {
 				return;
 			}
 
+			//
+			// Is the "next" node a
+			// [data-empty="true"] type of node?
+			//
 			if ($next.attr("data-empty") !== "true") {
 				return;
 			}
+
 			//
-			// In the editor + prev empty node
-			// take control of the event
+			// Time to take control of the event.
 			//
 			e.preventDefault();
 
+			//
+			// Set caret at the beginning of
+			// the empty node.
+			//
 			editor.util.focus($next[0]);
 		},
 
+		//
+		// The "left" key
+		//
 		"left": function(e) {
+			//
+			// Get a "contenteditable" target
+			// (e.target is not reliable)
+			//
 			var target = editor.util.getTarget();
-
 			if (!target) {
 				return;
 			}
 
+			//
+			// Are using the "left" key in
+			// the editor?
+			//
 			var $target = $(target);
-
 			if (!$target.closest(".feuilles-editor").length) {
 				return;
 			}
 
 			//
-			// If empty node, we know we're going to
-			// move to another node. If not, check that
-			// we're at the end of the last text node.
+			// If the caret is currently located
+			// in a [data-empty="true"] node, we know 
+			// for sure that hitting left will move the 
+			// caret to the previous node. 
+			//
+			// So, we have to check if we're not in an
+			// empty node, and check the offset of the caret.
+			// If the offset is not 0, we don't do anything.
 			//
 			if ($target.attr("data-empty") !== "true") {
 				var sel = window.getSelection();
-
-				if (editor.util.firstTextNode($target[0]) !== sel.focusNode) {
+				//
+				// We only want to consider the offset of
+				// the *first* text node of the node. 
+				//
+				// !!! The offset may be 0 if we're in 
+				// a conversation <span>. But that doesn't
+				// mean that we want to move to the previous
+				// node. 
+				//
+				if (editor.util.firstTextNode(target) !== sel.focusNode) {
 					return;
 				}
 
+				//
+				// Offset not 0, we don't move.
+				//
 				if (sel.focusOffset !== 0) {
 					return;
 				}
 			}
 
+			//
+			// Is there a "previous" node?
+			//
 			var $prev = $target.prev();
-
 			if (!$prev.length) {
 				return;
 			}
 
+			//
+			// Is the "previous" node a
+			// [data-empty="true"] type of node?
+			//
 			if ($prev.attr("data-empty") !== "true") {
 				return;
 			}
+
 			//
-			// In the editor + prev empty node
-			// take control of the event
+			// Time to take control of the event.
 			//
 			e.preventDefault();
 
+			//
+			// Set caret at the beginning of
+			// the empty node.
+			//
 			editor.util.focus($prev[0]);
 		},
 
+		//
+		// The "right" key
+		//
 		"right": function(e) {
+			//
+			// Get a "contenteditable" target
+			// (e.target is not reliable)
+			//
 			var target = editor.util.getTarget();
-
 			if (!target) {
 				return;
 			}
 
+			//
+			// Are using the "right" key in
+			// the editor?
+			//
 			var $target = $(target);
-
 			if (!$target.closest(".feuilles-editor").length) {
 				return;
 			}
 
 			//
-			// If empty node, we know we're going to
-			// move to another node. If not, check that
-			// we're at the end of the last text node.
+			// If the caret is currently located
+			// in a [data-empty="true"] node, we know 
+			// for sure that hitting right will move the 
+			// caret to the next node. 
+			//
+			// So, we have to check if we're not in an
+			// empty node, and check the offset of the caret.
+			// If the offset is not at the end of the last node, 
+			// we don't do anything.
 			//
 			if ($target.attr("data-empty") !== "true") {
-
 				var sel = window.getSelection();
+				var lastTextNode = editor.util.lastTextNode(target);
 
-				var lastTextNode = editor.util.lastTextNode($target[0]);
-
-				//console.log($target[0]);
-				//console.log(lastTextNode);
-				//console.log(sel.focusNode);
-
+				//
+				// Caret is not located in the last text node.
+				//
 				if (lastTextNode !== sel.focusNode) {
 					return;
 				}
 
+				//
+				// Caret is not located at the end
+				// of the last text node.
+				//
 				if (sel.focusOffset !== lastTextNode.length) {
 					return;
 				}
 			}
 
+			//
+			// Is there a "next" node?
+			//
 			var $next = $target.next();
-
 			if (!$next.length) {
 				return;
 			}
 
+			//
+			// Is the "next" node a
+			// [data-empty="true"] type of node?
+			//
 			if ($next.attr("data-empty") !== "true") {
 				return;
 			}
+
 			//
-			// In the editor + prev empty node
-			// take control of the event
+			// Time to take control of the event.
 			//
 			e.preventDefault();
 
+			//
+			// Set caret at the beginning of
+			// the empty node.
+			//
 			editor.util.focus($next[0]);
 		},
 	};
 
+	/**
+	 *
+	 * Handle key events
+	 *
+	 */
+	editor.writer.on = {};
 
-	editor.writer.on = {
-		"enter": function(e) {
-			$target = $(e.target);
-			if ($target.attr("data-feuilles-write") === "inline") {
-				e.preventDefault();
-				return false;
-			}
+	/**
+	 *
+	 * Handle the "enter" key
+	 *
+	 */
+	editor.writer.on.enter = function(e) {
+		//
+		// Prevent line jumps in "inline"
+		// contenteditables.
+		//
+		$target = $(e.target);
+		if ($target.attr("data-feuilles-write") === "inline") {
+			e.preventDefault();
+			return false;
+		}
 
-			if ($target.attr("data-feuilles-write") === "multiline") {
-				e.preventDefault();
+		//
+		// Handle line jumps in "multiline"
+		// contenteditables.
+		//
+		if ($target.attr("data-feuilles-write") === "multiline") {
+			e.preventDefault();
 
-				var sel = window.getSelection();
-				$node = $(sel.focusNode);
-
-				if (!$node.attr("data-token")) {
-					$node = $node.closest('[data-editor="token"]');
-				}
-
-				//
-				// About to create a new section.
-				// We first split the current section
-				// at caret position
-				//
-				var pieces = editor.util.contentToPieces($node[0]);
-				pieces[0] = editor.util.noBr(pieces[0]);
-				pieces[1] = editor.util.noBr(pieces[1]);
-
-				//
-				// Check if the current section (the one
-				// where the caret was located when the
-				// user hit "enter") is empty.
-				//
-				var isEmpty;
-				if ($.trim(editor.util.noBr(pieces[0])) === "") {
-					isEmpty = true;
-				}
-
-				//
-				// If the current section (pieces[0]) is empty 
-				// and not a list, turn it into <hr>
-				//
-				if (isEmpty) {
-					$node.attr("data-empty", "true");
-					$node.html("");
-				}
-
-
-				// Update current section before moving to
-				// the next one. The browser is kind enough
-				// to fix unclosed tags for us. Normally.
-				//
-				if (!isEmpty) {
-					$node.html(pieces[0]);
-				}
-
-				var $newEl = $('<div data-editor="token" data-token="p" data-empty="false">' + pieces[1] + '</div>');
-
-				$newEl.html(editor.util.noBr($newEl.html()));
-
-				$node.after($newEl);
-
-				$newEl.html(editor.util.noBr($newEl.html()));
-
-				editor.util.focus($newEl[0]);
-
-				return false;
-			}
-		},
-		"backspace": function(e) {
-
-			$target = $(e.target);
-
-			if ($target.attr("data-feuilles-write") !== "multiline") {
-				return;
-			}
-
+			//
+			// Get a "node" instance. Either
+			// the caret is already in a node, or
+			// we get the closest instace.
+			//
 			var sel = window.getSelection();
-			$node = $(sel.focusNode);
-
+			var $node = $(sel.focusNode);
 			if (!$node.attr("data-token")) {
 				$node = $node.closest('[data-editor="token"]');
 			}
+			var node = $node[0];
 
-			if (!$node.attr("data-token")) {
+			//
+			// We're about to create a new node.
+			// We first split the current node
+			// at caret position.
+			//
+			var pieces = editor.util.contentToPieces(node);
+
+			//
+			// This the part that stays in the current node.
+			//
+			pieces[0] = editor.util.noBr(pieces[0]);
+
+			//
+			// This is the part that is injected into
+			// the new node.
+			//
+			pieces[1] = editor.util.noBr(pieces[1]);
+
+			//
+			// Check if the current node (the one
+			// where the caret was located when the
+			// user hit "enter") is empty.
+			//
+			var isEmpty;
+			if ($.trim(editor.util.noBr(pieces[0])) === "") {
+				isEmpty = true;
+			}
+
+			//
+			// If the current node (the one holding pieces[0]) 
+			// is empty, mark it as such.
+			//
+			if (isEmpty) {
+				$node.attr("data-empty", "true");
+				$node.html("");
+			}
+
+			// Update current node before moving to
+			// the next one.
+			//
+			if (!isEmpty) {
+				$node.html(pieces[0]);
+			}
+
+			//
+			// Create the new node
+			//
+			var $newEl = $('<div data-editor="token" data-token="p" data-empty="false">' + pieces[1] + '</div>');
+
+			//
+			// Into the DOM
+			//
+			$node.after($newEl);
+
+			//
+			// Remove <br>s
+			//
+			$newEl.html(editor.util.noBr($newEl.html()));
+
+			//
+			// Set focus
+			//
+			editor.util.focus($newEl[0]);
+		}
+	};
+
+	/**
+	 *
+	 * Handle the "backspace" key
+	 *
+	 */
+	editor.writer.on.backspace = function(e) {
+		//
+		// We only want to intervene in
+		// "multiline" contenteditables.
+		//
+		$target = $(e.target);
+		if ($target.attr("data-feuilles-write") !== "multiline") {
+			return;
+		}
+
+		//
+		// Get a "node" instance. Either
+		// the caret is already in a node, or
+		// we get the closest instace.
+		//
+		var sel = window.getSelection();
+		$node = $(sel.focusNode);
+		if (!$node.attr("data-token")) {
+			$node = $node.closest('[data-editor="token"]');
+		}
+		var node = $node[0];
+
+		//
+		// We only want to work in specific nodes
+		//
+		if (!$node.attr("data-token")) {
+			return;
+		}
+
+		//
+		// Get variables that will help us make
+		// the right decision
+		//
+		var nodeContent = editor.util.noBr($node.html());
+
+		var firstTextNode = editor.util.firstTextNode(node);
+		if (!firstTextNode &&  nodeContent === "") {
+			firstTextNode = sel.focusNode;
+		} 
+
+		//
+		// First node scenario
+		//
+		if ($node.is(":first-child")) {
+			//
+			// Last node is already empty.
+			// Do nothing.
+			//
+			if ($node.html() === "") {
+				e.preventDefault();
 				return;
 			}
 
-			var firstTextNode = editor.util.firstTextNode($node[0]);
-
-			var deleteNode = (firstTextNode === sel.focusNode && sel.focusOffset === 0);
-
+			//
+			// Check if last node is being emptied
+			//
+			var deleteNode = (firstTextNode === sel.focusNode && sel.focusOffset <= 1);
 			if (!deleteNode) {
 				return;
 			}
-
-			return;
-
-			var nodeContent = $node.html();
-
-			if ($.trim(nodeContent) === "") {
-				empty = true;
-			}
-
 			e.preventDefault();
-
-			$prev = $node.prev();
-
-			console.log($prev[0]);
-
+			if (sel.focusOffset === 1) {
+				nodeContent = nodeContent.substr(1);
+			}
+			$node.html(nodeContent);
+			return;
 		}
+
+		//
+		// Get the "previous" node?
+		//
+		var $prev = $node.prev();
+		if (!$prev.length) {
+			return;
+		}
+
+		//
+		// Is the "previous" node a
+		// [data-empty="true"] type of node?
+		// If the node doesn't have a data-empty
+		// attribute set to true, the browser
+		// will set the focus correctly. Otherwise
+		// we have to provide some help.
+		//
+		if ($prev.attr("data-empty") !== "true") {
+			return;
+		}
+
+		var nodeContent = editor.util.noBr($node.html());
+
+		var firstTextNode = editor.util.firstTextNode(node);
+		if (!firstTextNode &&  nodeContent === "") {
+			firstTextNode = sel.focusNode;
+		} 
+
+		var deleteNode = (firstTextNode === sel.focusNode && sel.focusOffset <= 1);
+		if (!deleteNode) {
+			return;
+		}
+
+		e.preventDefault();
+
+		//
+		// Stay in the same node
+		//
+		if (sel.focusOffset === 1) {
+			nodeContent = nodeContent.substr(1);
+			$node.html(nodeContent);
+			return;
+		}
+
+		//
+		// Move to previous node
+		//
+		$prev.html(nodeContent);
+		$prev.attr("data-empty", "false");
+		$node.remove();
+		editor.util.focus($prev[0]);
+
 	};
 
 }).call(this);

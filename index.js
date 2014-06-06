@@ -12,7 +12,7 @@ var user = {
 // Feel free to create mock documents that outline 
 // specific problems.
 //
-var mockDoc = "document2";
+var mockDoc = "one-line";
 
 /**
  *

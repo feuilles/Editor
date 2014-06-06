@@ -95,6 +95,59 @@
 	};
 
 
+	/**
+	 *
+	 * This is where we translate our raw content
+	 * into an editor, HTML-ish, rich content
+	 *
+	 */
+	editor.util.makeContent = function(content) {
+		
+		// console.log(content);
+
+		//
+		// Highlight refs
+		//
+		content = content.replace(/{ref for=([\s\S]*?)}([\s\S]*?){\/ref}/g, '<span class="conversation-highlight" data-ref-for="$1">$2</span>', content);
+
+		//
+		// Hide embedded conversations
+		//
+		//content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, '<div class="embedded-conversation" style="display:none;" data-conversation-id="$1">$2<\/div>');
+		var conv = content.match(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g);
+		content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, "");
+
+		var br = content.split(/(?:\r\n|\r|\n)/g);
+
+		if (br) {
+			var lineByLine = "";
+			for (var j = 0; j < br.length; j++) {
+				if ($.trim(br[j]) === "") {
+					lineByLine += '<div data-editor="token" data-token="p" data-empty="true"></div>';
+				} else {
+					lineByLine += '<div data-editor="token" data-token="p">' + br[j] + "</div>";
+				}
+
+				content = lineByLine;
+
+			};
+		} else {
+			content = '<div data-editor="token" data-token="p">' + content + '</div>';
+		}
+
+		if (conv) {
+			for (var i = 0; i < conv.length; i++) {
+				content += conv[i].replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, '\n\n<div class="embedded-conversation" style="display:none;" data-conversation-id="$1">$2<\/div>');
+				//content += conv[i]
+			};
+		}
+
+		//console.log(content);
+
+		$('[data-feuilles-write="multiline"]').html(content);
+	};
+
+
 	// http: //stackoverflow.com/questions/7781963/js-get-array-of-all-selected-nodes-in-contenteditable-div
 	editor.util.nextNode = function(node) {
 		if (node.hasChildNodes()) {
@@ -239,6 +292,7 @@
 	};
 
 	editor.util.focus = function(el) {
+
 
 
 		// In some cases, we may just have a <br>, 
