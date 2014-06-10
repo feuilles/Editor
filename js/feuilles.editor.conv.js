@@ -1,53 +1,79 @@
+/*!
+ * FeuillesEditor (https://github.com/feuilles/Editor)
+ * Copyright 2014 Alex Duloz
+ * Licensed under MIT (https://github.com/feuilles/Editor/blob/gh-pages/LICENSE)
+ */
+
 //
-// Embedded conversations, how they look like:
+// Example of an embedded conversation
 //
 /*
-Hello, I am a text and this is cool. {ref for=alexduloz}I am some ref{/ref}.
+Hello, I am a text and this is cool. {ref for=alexduloz 22-June-2014 17:08:46}I am some ref{/ref}.
 	
-	{conversation id=12345}
+	{conversation id=alexduloz 22-June-2014 17:08:46}
 	[
 		{
+			"reference": "I am some ref",
 			"author": "alexduloz",
-			"date": "21-12-2014 08:00",
+			"date": "21-12-2014 08:00:00",
 			"content": "Hello, I'm a comment"
 		},
 		{
-			"author": "bli",
-			"date": "21-12-2014 08:00",
+			"reference": "I am some ref",
+			"author": "alexduloz",
+			"date": "21-12-2014 08:05:32",
 			"content": "Hey, I'm a reply"
 		}
 	]
 	{/conversation}
-	
-And later, there can be {ref for=67890}another ref{/ref}.
-	
-	{conversation id=67890}
-	[
-		{
-			"author": "alexduloz",
-			"date": "21-12-2014 08:00",
-			"content": "Hello, I'm a comment"
-		},
-		{
-			"author": "bli",
-			"date": "21-12-2014 08:00",
-			"content": "Hey, I'm a reply"
-		}
-	]
-	{/conversation}
-
 */
 
 (function() {
 
-	var self = editor.conv = {};
+	//
+	// DOM Elements
+	//
+	var $body,
+		$deleteConvContainer,
+		$conversationRef,
+		$conversationInput,
+		$conversationEmpty,
+		$conversation,
+		$writerCol,
+		$conversationCol,
+		$conversationItems,
+		$conversationNone,
+		$sayIt,
+		$theEditor,
+		$sure,
+		$template,
+		$conversationTitle;
+
 
 	/**
 	 *
 	 * Private var to store the current
-	 * conversation
+	 * conversation (the one that is being
+	 * highlighted).
 	 */
-	editor.conv._conversationReadableId = null;
+	var conversationReadableId = null;
+
+	/**
+	 *
+	 * The conversation node to delete
+	 *
+	 */
+	var $deleteNode = null;
+
+	/**
+	 *
+	 * The HTML of the template.
+	 * (No need for a templating plugin.)
+	 *
+	 */
+	var templateHTML = null;
+
+	var self = editor.conv = {};
 
 	/**
 	 *
@@ -56,11 +82,29 @@ And later, there can be {ref for=67890}another ref{/ref}.
 	 */
 	editor.conv.init = function(callback) {
 
+		$body = $("body");
+		$deleteConvContainer = $(".delete-conv-container");
+		$conversationRef = $(".conversation-reference");
+		$conversationInput = $(".conversation-input");
+		$conversationEmpty = $(".conversation-empty");
+		$conversation = $(".conversations");
+		$writerCol = $(".writer-col");
+		$conversationCol = $(".conversations-col");
+		$conversationItems = $(".conversation-items");
+		$conversationNone = $(".conversation-none");
+		$sayIt = $("#say_it");
+		$theEditor = $("#the-editor");
+		$sure = $("#sure");
+		$template = $("#conversation-template");
+		templateHTML = $template.html();
+		$conversationTitle = $(".conversation-title");
+
+
 		//
 		// Close conversation pane
 		//
 		kDown.whenShortcut("alt+esc", function(e) {
-			editor.conv.close();
+			editor.conv.hide();
 		});
 
 		//
@@ -78,97 +122,175 @@ And later, there can be {ref for=67890}another ref{/ref}.
 		});
 
 		//
-		// Conversation prompt: don't delete
+		// Conversation prompt: delete -> nope
 		//
 		$("body").on("click", ".delete-conv-nope", function(e) {
 			self.removeNope();
 		});
 
 		//
-		// Conversation prompt: delete
+		// Conversation prompt: delete -> yep
 		//
 		$("body").on("click", ".delete-conv-yep", function(e) {
 			self.removeYep();
 		});
 
+		//
+		// When no conversation is highlighted and you
+		// open the conv pane, there is a list of all the
+		// active conversations. This is what happens when you
+		// click on an item of that list.
+		//
 		$("body").on("click", ".conversation-all-ref", function(e) {
 			e.preventDefault();
-			var readableId = $(this).attr("data-related-ref");
-			editor.conv.loadConversation(readableId);
+			conversationReadableId = $(this).attr("data-related-ref");
+			editor.conv.loadOne();
 			return false;
 		});
 
-		/**
-		 *
-		 * Toggle conversations
-		 *
-		 */
+		//
+		// Show/Hide conversation pane -> click
+		//
 		$("body").on("click", "#toggle-conversation", function(e) {
 			e.preventDefault();
 			editor.conv.toggleConversation();
 			return false;
 		});
 
+		//
+		// Show/Hide conversation pane -> kbd
+		//
 		kDown.whenShortcut("alt+cmd", function(e) {
 			e.preventDefault();
 			editor.conv.toggleConversation();
 			return false;
 		});
 
+		//
+		// The "converse" icon
+		//
 		$("body").on("click", ".btn-start-conversation", function(e) {
-			editor.conv.startConversation(e)
+			editor.conv.start(e)
 		});
 
+		//
+		// Submitting a new comment
+		//
 		$("body").on("submit", '[name="converse"]', function(e) {
-			editor.conv.addConversationItem(e);
+			editor.conv.addItem(e);
 		});
 
-		$("body").on("click", ".show-conversations-pane .conversation-highlight", function(e) {
+		//
+		// In the body of the text, when the conversation pane is open, 
+		// you can see all the conversations that are active. That's what
+		// happen when you click on a conversation.
+		//
+		$("body").on("click", ".show-conversations .conversation-highlight", function(e) {
 			e.preventDefault();
-			var conversationReadableId = $(this).attr("data-ref-for");
-			editor.conv.loadConversation(conversationReadableId);
+			conversationReadableId = $(this).attr("data-ref-for");
+			editor.conv.loadOne();
 			return false;
 		});
 
+		//
+		// The little cross to close the conversation pane
+		//
 		$("body").on("click", ".hide-conversations-pane button", function(e) {
-
 			e.preventDefault();
-			
-			editor.conv.close(e);
-			
-			/*
-			$(".conversations").hide();
-			$("body").removeClass("show-conversations-pane");
-
-			$(".writer-col").removeClass("col-md-8");
-			$(".conversations-col").removeClass("col-md-4");
-
-			$(".conversation-highlighted").removeClass("conversation-highlighted");
-			*/
-
+			editor.conv.hide();
 			return false;
 		});
 
 		callback();
 	};
 
-	editor.conv.startConversation = function() {
+	/**
+	 *
+	 * Show conversation pane
+	 *
+	 */
+	editor.conv.show = function(args) {
+		//
+		// Show/Hide elements
+		//
+		$body.addClass("show-conversations");
+		$conversation.hide().css("min-height", $(".feuilles-editor-container").height() + "px");
+		$conversation.show();
+		$writerCol.addClass("col-md-8"); // class from Twitter Bootstrap
+		$conversationCol.addClass("col-md-4"); // class from Twitter Bootstrap
+
+		if (args) {
+			if (args.ref) {
+				$deleteConvContainer.show();
+				$conversationRef.show();
+				$conversationInput.show();
+				$conversationEmpty.hide();
+				//
+				// In conversation pane: add ref and focus on the textarea
+				//
+				setTimeout(function() {
+					$sayIt.focus();
+					$("#conversation-reference").text(args.ref);
+				}, 1);
+			}
+			if (args.isNew) {
+				$conversationItems.html("");
+				$conversationNone.show();
+			}
+		}
+	};
+
+	/**
+	 *
+	 * Hide conversation pane
+	 *
+	 */
+	editor.conv.hide = function() {
+		$conversation.hide();
+		$body.removeClass("show-conversations");
+		$writerCol.removeClass("col-md-8");
+		$conversationsCol.removeClass("col-md-4");
+	};
+
+	/**
+	 *
+	 * Starting a new conversation
+	 *
+	 */
+	editor.conv.start = function() {
+		//
+		// Get selection
+		//
 		var sel = window.getSelection();
 
+		//
+		// No text selected
+		//
 		if (sel.isCollapsed) {
 			notify("Select some text to start a conversation");
 			return;
 		}
 
+		//
+		// e.target is not reliable in
+		// contenteditable environments
+		//
 		var target = editor.util.getTarget();
 
+		//
+		// Selected text is part of a conversation node
+		//
 		if ($(target).attr("data-ref-for")) {
 			notify("The text you highlighted is already part of a conversation");
 			return;
 		}
 
+		//
+		// Selected text contains nodes that are not
+		// that are not text nodes. Probably a cross-p
+		// issue. Could also be a cross-span problem.
+		//
 		var nodes = editor.util.getSelectedNodes();
-
 		if (nodes) {
 			for (var i = 0; i < nodes.length; i++) {
 				if (nodes[i].nodeType !== 3) {
@@ -178,108 +300,140 @@ And later, there can be {ref for=67890}another ref{/ref}.
 			};
 		}
 
-		$body = $("body");
-
-		$body.addClass("show-conversations-highlights");
-		$body.addClass("show-conversations-pane");
-
-		$(".delete-conv-container").show();
-		$(".conversation-reference").show();
-		$(".conversation-input").show();
-		$(".conversation-empty").hide();
-
+		//
+		// The piece of text to highlight
+		//
 		var reference = sel.toString();
-		if (sel.rangeCount) {
-			var range = sel.getRangeAt(0).cloneRange();
-			var div = document.createElement("div");
-			var span = document.createElement("span");
 
-			//
-			// Surround our ref
-			//
-			div.setAttribute("class", "embedded-conversation");
-			div.style.display = "none";
+		editor.conv.show({
+			ref: reference,
+			isNew: true,
+		});
 
-			span.setAttribute("class", "conversation-highlight");
+		//
+		// Prepare to surround the text highighted
+		// and create a conversation object (hidden
+		// in a div).
+		//
+		var range = sel.getRangeAt(0).cloneRange();
+		var div = document.createElement("div");
+		var span = document.createElement("span");
+		div.setAttribute("class", "embedded-conversation");
+		div.style.display = "none";
+		span.setAttribute("class", "conversation-highlight");
 
-			//
-			// Show conversation pane
-			//
-			$conversation = $(".conversations");
+		//
+		// Create a new conversation,
+		// so clean previous highlight
+		//
+		$(".conversation-highlighted").removeClass("conversation-highlighted");
 
-			$conversation.css("min-height", $(".feuilles-editor-container").height() + "px");
+		//
+		// Store the conversation ID
+		//
+		conversationReadableId = user.username + " " + editor.util.moment();
 
-			$conversation.fadeIn();
-			$(".writer-col").addClass("col-md-8");
-			$(".conversations-col").addClass("col-md-4");
+		//
+		// Highlight the new conv and
+		// create the conv container
+		//
+		span.setAttribute("data-ref-for", conversationReadableId);
+		div.setAttribute("data-conversation-id", conversationReadableId);
+		$(span).addClass("conversation-highlighted");
 
-			$(".conversation-items").html("");
-			$(".conversation-none").show();
+		//
+		// Highlight
+		//
+		range.surroundContents(span);
+		$theEditor.append(div);
 
-			//
-			// In conversation pane: add ref and focus on the textarea
-			//
-			setTimeout(function() {
-				sel.removeAllRanges();
-				$("#say_it").focus();
-				$("#conversation-reference").text(reference);
-			}, 1);
+		sel.removeAllRanges();
+		sel.addRange(range);
 
-			//
-			// Create a new conversation
-			//
-			$(".conversation-highlighted").removeClass("conversation-highlighted");
-
-			conversationReadableId = user.username + " " + editor.util.moment();
-
-			span.setAttribute("data-ref-for", conversationReadableId);
-			div.setAttribute("data-conversation-id", conversationReadableId);
-			$(span).addClass("conversation-highlighted");
-			editor.save();
-
-			editor.conv._conversationReadableId = conversationReadableId;
-
-			/*
-			post(urls.api.conversation.create, data, function(err, res) {
-				if (!err) {
-					conversationReadableId = res.conversation_readable_id;
-					span.setAttribute("data-ref-for", res.conversation_readable_id);
-					div.setAttribute("data-conversation-id", res.conversation_readable_id);
-					$(span).addClass("conversation-highlighted");
-					save.doc();
-				}
-			});
-
-			*/
-
-			range.surroundContents(span);
-
-			$("#the-editor").append(div);
-
-			sel.removeAllRanges();
-			sel.addRange(range);
-		}
+		//
+		// Save the document
+		//
+		editor.save();
 	}
 
 	/**
 	 *
-	 * Close conversation pane
+	 * Remove a conversation from the document
 	 *
 	 */
-	editor.conv.close = function(e) {
-		$conversation = $(".conversations");
+	editor.conv.remove = {};
 
-		if ($conversation.length) {
-			if ($conversation.is(":visible")) {
-				e.preventDefault();
-				$conversation.hide();
-				$("body").removeClass("show-conversations-highlights");
-				$("body").removeClass("show-conversations-pane");
-				$(".writer-col").removeClass("col-md-8");
-				$(".conversations-col").removeClass("col-md-4");
-				return false;
-			}
+	/**
+	 *
+	 * Remove a conversation via
+	 * the kbd
+	 * @see editor.conv.init for the kDown shortcut
+	 *
+	 */
+	editor.conv.remove.viaShortcut = function(e) {
+		e.preventDefault();
+		var sel = window.getSelection();
+
+		//
+		// Get the conv node to delete.
+		//
+		$deleteNode = $(sel.focusNode).closest(".conversation-highlight");
+
+		//
+		// Shortcut performed when caret was not
+		// in a conv node: exit.
+		//
+		if (!$deleteNode.length) {
+			return;
 		}
+
+		//
+		// Prompt to confirm deletion
+		//
+		editor.conv.remove.prompt();
+
+	};
+
+	/**
+	 *
+	 * Remove a conversation via
+	 * the click event
+	 * @see editor.conv.init for the event
+	 *
+	 */
+	editor.conv.remove.viaClick = function(e) {
+		e.preventDefault();
+
+		//
+		// Get the conv node to delete.
+		// If user can see the "delete" icon,
+		// it means a conversation is selected,
+		// which means that conversation id is
+		// available in the global space.
+		// @see editor.conv.init for the click
+		// event that stores the conv id.
+		//
+		$deleteNode = $('[data-ref-for="' + conversationReadableId + '"]');
+		if (!$deleteNode.length) {
+			return;
+		}
+
+		//
+		// Prompt to confirm deletion
+		//
+		editor.conv.remove.prompt();
+	};
+
+	/**
+	 *
+	 * Ask the user to confirm deletion
+	 * @see editor.conv.init for the prompts
+	 *
+	 */
+	editor.conv.remove.prompt = function() {
+		var sure = $sure.html();
+		$('.editor-modal .modal-content').html(sure);
+		$('.editor-modal').modal("show");
 	};
 
 	/**
@@ -289,67 +443,49 @@ And later, there can be {ref for=67890}another ref{/ref}.
 	 */
 	editor.conv.removeNope = function() {
 		$('.editor-modal').modal("hide");
-		editor.conv._$deleteNode = null;
 	};
 
 	/**
 	 *
-	 * Delete a conv
+	 * __Do__ delete a conv
+	 *
+	 * The variable holding the node
+	 * to delete is available in the global
+	 * space.
+	 *
+	 * @see editor.conv.remove to see how we
+	 * store that variable.
 	 *
 	 */
 	editor.conv.removeYep = function() {
 		$('.editor-modal').modal("hide");
 
-		$deleteNode = self._$deleteNode;
-
+		//
+		// Get the conv id
+		//
 		var convId = $deleteNode.attr("data-ref-for");
 
+		//
+		// Get the ref, and inject it before the node.
+		//
 		$deleteNode.before($deleteNode.text()).remove();
 
+		//
+		// Delete the node.
+		//
 		$('[data-conversation-id="' + convId + '"]').remove();
 
-		self.loadAllConversations();
+		//
+		// Since we're no longer focusing on one
+		// specific conversation, we load *all* the
+		// active conversations.
+		//
+		self.loadAll();
 
+		//
+		// Doc has been modified. Save.
+		//
 		editor.save();
-	};
-
-	/**
-	 *
-	 * Remove a conversation from the document
-	 * @see editor.conv.init for the prompts
-	 *
-	 */
-	editor.conv._$deleteNode = null;
-	editor.conv.remove = {
-		viaShortcut: function(e) {
-			var sel = window.getSelection();
-
-			$deleteNode = $(sel.focusNode).closest(".conversation-highlight");
-
-			if (!$deleteNode.length) {
-				return;
-			}
-			e.preventDefault();
-
-			self._$deleteNode = $deleteNode;
-
-			editor.conv.remove.prompt();
-
-		},
-		viaClick: function(e) {
-			e.preventDefault();
-
-			$deleteNode = $('[data-ref-for="' + conversationReadableId + '"]');
-
-			self._$deleteNode = $deleteNode;
-
-			editor.conv.remove.prompt();
-		},
-		prompt: function() {
-			var sure = $("#sure").html();
-			$('.editor-modal .modal-content').html(sure);
-			$('.editor-modal').modal("show");
-		}
 	};
 
 	/**
@@ -358,37 +494,32 @@ And later, there can be {ref for=67890}another ref{/ref}.
 	 * in the conversation pane
 	 *
 	 */
-	editor.conv.loadConversation = function(readable_id) {
+	editor.conv.loadOne = function() {
+		//
+		// The id of the conversation should
+		// be available in the global scope
+		//
+		if (!conversationReadableId) {
+			return;
+		}
 
-		var $container = $(".conversation-items");
+		//
+		// Get the reference
+		//
+		var reference = $('[data-ref-for="' + conversationReadableId + '"]').text();
 
-		$container.html("");
+		//
+		// Show the conversation pane
+		//
+		editor.conv.show({
+			ref: reference,
+			isNew: false,
+		});
 
-		$(".conversing-about").hide();
-
-		$(".conversation-empty").hide();
-
-		$("body").addClass("show-conversations-pane");
-
-		$(".delete-conv-container").show();
-
-		$(".writer-col").addClass("col-md-8");
-		$(".conversations-col").addClass("col-md-4");
-
-		$(".conversation-reference").show();
-		$(".conversation-input").show();
-
-		$conversation = $(".conversations");
-
-		$conversation.css("min-height", $(".feuilles-editor-container").height() + "px");
-
-		$conversation.show();
-
-		conversationReadableId = readable_id;
+		$conversationItems.html("");
 
 		$(".conversation-highlighted").removeClass("conversation-highlighted");
-
-		$('[data-ref-for="' + readable_id + '"]').addClass("conversation-highlighted");
+		$('[data-ref-for="' + conversationReadableId + '"]').addClass("conversation-highlighted");
 
 		//
 		// Things are embedded
@@ -399,21 +530,17 @@ And later, there can be {ref for=67890}another ref{/ref}.
 		} catch (e) {
 			ok = false;
 		}
-
-		var template = $("#conversation-template").html();
-
-		var reference = $('[data-ref-for="' + readable_id + '"]').text();
 		$("#conversation-reference").text(reference);
 
 		var div = document.createElement("div");
-		div.innerHTML = template;
+		div.innerHTML = templateHTML;
 		var $div = $(div);
 
 		if (ok) {
-			$(".conversation-none").hide();
+			$conversationNone.hide();
 			for (var i = 0; i < conv.length; i++) {
 				$div.find(".conversation-new-reference").text(conv[i].reference);
-				if (conv[i].reference_modified === true) {
+				if (conv[i].reference !== reference) {
 					$div.find(".conversation-new-reference").show();
 				} else {
 					$div.find(".conversation-new-reference").hide;
@@ -427,69 +554,70 @@ And later, there can be {ref for=67890}another ref{/ref}.
 		}
 
 		if (!ok) {
-			$(".conversation-none").show();
+			$conversationNone.show();
 		}
 	};
 
 	/**
 	 *
-	 * Load a list of all the conversations
+	 * Load a list of all the active
+	 * conversations embedded in the document.
 	 *
 	 */
-	editor.conv.loadAllConversations = function() {
-
-		var $container = $(".conversation-items");
-
-		$container.html("");
-
-		$(".conversing-about").show();
-		$(".conversation-empty").hide();
-
-		$(".delete-conv-container").hide();
-
-		$(".conversation-none").hide();
-
-		$(".writer-col").addClass("col-md-8");
-		$(".conversations-col").addClass("col-md-4");
-
-		$(".conversation-reference").hide();
-		$(".conversation-input").hide();
-
-		$conversation = $(".conversations");
-
+	editor.conv.loadAll = function() {
+		//
+		// All conv: handling the DOM 
+		//
+		$conversationItems.html("");
+		$conversationTitle.show();
+		$conversationEmpty.hide();
+		$deleteConvContainer.hide();
+		$conversationNone.hide();
+		$writerCol.addClass("col-md-8");
+		$conversationCol.addClass("col-md-4");
+		$conversationRef.hide();
+		$conversationInput.hide();
 		$conversation.show();
 
+		//
+		// The HTML template for the loadAll pane
+		//
 		var template = $("#conversation-all-template").html();
-
 		var div = document.createElement("div");
 		div.innerHTML = template;
-		var $div = $(div);
+		var $template = $(div);
 
-		var $container = $(".conversation-items");
+		//
+		// Adjust height
+		//
+		$conversationItems.css("min-height", $(".feuilles-editor-container").height() + "px");
 
-		$conversation.css("min-height", $(".feuilles-editor-container").height() + "px");
-
+		//
+		// Gather highlights
+		//
 		$highlights = $(".conversation-highlight");
 
+		//
+		// No active conversation yet
+		//
 		if (!$highlights.length) {
 			$(".conversation-empty").show();
 			$(".conversation-reference").hide();
 			$(".conversation-input").hide();
 			$(".delete-conv-container").hide();
-
 			return;
 		}
 
-		$(".conversation-highlight").each(function() {
+		//
+		// List all the active conversations
+		//
+		$highlights.each(function() {
 			$this = $(this);
-
 			var ref = $this.text();
-
-			$ref = $div.find(".conversation-all-ref");
+			$ref = $template.find(".conversation-all-ref");
 			$ref.text(ref);
 			$ref.attr("data-related-ref", $this.attr("data-ref-for"));
-
-			$container.append($div.html());
+			$conversationItems.append($template.html());
 		});
 	};
 
@@ -499,19 +627,15 @@ And later, there can be {ref for=67890}another ref{/ref}.
 	 *
 	 */
 	editor.conv.toggleConversation = function() {
-		$conversation = $(".conversations");
-
+		//
+		// Visible? Hide.
+		//
 		if ($conversation.is(":visible")) {
-
-			$(".writer-col").removeClass("col-md-8");
-			$(".conversations-col").removeClass("col-md-4");
-
+			$writerCol.removeClass("col-md-8");
+			$conversationCol.removeClass("col-md-4");
 			$conversation.hide();
-			$("body").removeClass("show-conversations-highlights");
-			$("body").removeClass("show-conversations-pane");
-
+			$body.removeClass("show-conversations");
 			$(".conversation-highlighted").removeClass("conversation-highlighted");
-
 			return;
 		}
 
@@ -520,10 +644,12 @@ And later, there can be {ref for=67890}another ref{/ref}.
 		// We can either fill it with a specific conversation or
 		// with *all* the conversations.
 		//
+		$body.addClass("show-conversations");
 
-		$("body").addClass("show-conversations-highlights");
-		$("body").addClass("show-conversations-pane");
-
+		//
+		// Check if the caret is inside a
+		// highlighted node.
+		//
 		var sel = window.getSelection();
 		$highlight = $(sel.focusNode).closest(".conversation-highlight");
 
@@ -531,17 +657,16 @@ And later, there can be {ref for=67890}another ref{/ref}.
 		// Load a specific conversation
 		//
 		if ($highlight.length) {
-			var readableId = $highlight.attr("data-ref-for");
-			self.loadConversation(readableId);
+			conversationReadableId = $highlight.attr("data-ref-for");
+			self.loadOne();
 		}
 
 		//
 		// Load a list of all conversations
 		//
 		if (!$highlight.length) {
-			self.loadAllConversations();
+			self.loadAll();
 		}
-
 	};
 
 
@@ -550,57 +675,71 @@ And later, there can be {ref for=67890}another ref{/ref}.
 	 * Add an item to a conversation
 	 *
 	 */
-	editor.conv.addConversationItem = function(e) {
-
+	editor.conv.addItem = function(e) {
 		e.preventDefault();
-
-		conversationReadableId = editor.conv._conversationReadableId;
 
 		if (!conversationReadableId) {
 			notify("No conversation selected");
 			return;
 		}
 
-		var content = $("#say_it").val();
-
+		//
+		// Get the submitted content
+		//
+		var content = $sayIt.val();
 		if (!content) {
 			notify("Say something");
 			return;
 		}
 
+		//
+		// Reset input value
+		//
+		$sayIt.val("");
+
+		//
+		// Get the ref
+		//
 		var reference = $('[data-ref-for="' + conversationReadableId + '"]').text();
 		$("#conversation-reference").text(reference);
 
 		//
-		// Get the content of the embedded conv and update it
+		// Hide the "no conv" message
 		//
-		var currentConv = $('[data-conversation-id="' + conversationReadableId + '"]').text();
+		$conversationNone.hide();
 
-		$(".conversation-none").hide();
-
+		//
+		// Get the HTML template 
+		//
 		var template = $("#conversation-template").html();
-
-		var reference = $('[data-ref-for="' + conversationReadableId + '"]').text();
-		$("#conversation-reference").text(reference);
-
 		var div = document.createElement("div");
 		div.innerHTML = template;
 		var $div = $(div);
 
+		//
+		// Our readable it.
+		//
 		var moment = editor.util.moment();
 
-		var $container = $(".conversation-items");
-
+		//
+		// Conversation item: populate
+		//
 		$div.find(".conversation-new-reference").text(reference);
-
 		$div.find(".conversation-username").text(user.username);
 		$div.find(".conversation-content").text(content);
 		$div.find(".conversation-nicedate").text(moment);
-		$container.prepend($div.html());
+		$conversationItems.prepend($div.html());
 
-		$("#say_it").val("");
+		//
+		// Get the content of the embedded conv 
+		// and update it (the JSON part)
+		//
+		var currentConv = $('[data-conversation-id="' + conversationReadableId + '"]').text();
 
 		if ($.trim(currentConv) === "") {
+			//
+			// First item in the current conv
+			//
 			var theConv = [{
 				"reference": reference,
 				"author": user.username,
@@ -610,6 +749,9 @@ And later, there can be {ref for=67890}another ref{/ref}.
 			theConv = JSON.stringify(theConv, null, 4);
 			$('[data-conversation-id="' + conversationReadableId + '"]').text(theConv);
 		} else {
+			//
+			// Add item to the current conv
+			//
 			var theConv = JSON.parse(currentConv);
 			theConv.push({
 				"reference": reference,
@@ -621,75 +763,11 @@ And later, there can be {ref for=67890}another ref{/ref}.
 			$('[data-conversation-id="' + conversationReadableId + '"]').text(theConv);
 		}
 
+		//
+		// Update doc
+		//
 		editor.save();
 
-		/*
-		var data = {
-			conversation_readable_id: conversationReadableId,
-			sha: $('[data-name="sha"]').attr("data-value"),
-			content: $("#say_it").val(),
-			reference: reference
-		}
-
-		post(urls.api.conversation.item.create, data, function(err, res) {
-
-			if (!err) {
-
-				$(".conversation-none").hide();
-
-				$("#say_it").val("");
-
-				var template = $("#conversation-template").html();
-
-				var reference = $('[data-ref-for="' + conversationReadableId + '"]').text();
-				$("#conversation-reference").text(reference);
-
-				var div = document.createElement("div");
-				div.innerHTML = template;
-				var $div = $(div);
-
-				var $container = $(".conversation-items");
-
-				$div.find(".conversation-new-reference").text(res.conversation.reference);
-
-				$div.find(".conversation-username").text(res.conversation.username);
-				$div.find(".conversation-content").text(res.conversation.content);
-				$div.find(".conversation-nicedate").text(res.conversation.nicedate);
-				$container.prepend($div.html());
-
-				if ($.trim(currentConv) === "") {
-					var theConv = [{
-						"id": res.conversation.id,
-						"reference": reference,
-						"author": res.conversation.username,
-						"date": res.conversation.nicedate,
-						"content": res.conversation.content
-					}];
-					theConv = JSON.stringify(theConv, null, 4);
-					$('[data-conversation-id="' + conversationReadableId + '"]').text(theConv);
-				} else {
-					var theConv = JSON.parse(currentConv);
-					theConv.push({
-						"id": res.conversation.id,
-						"reference": reference,
-						"author": res.conversation.username,
-						"date": res.conversation.nicedate,
-						"content": res.conversation.content
-					});
-					theConv = JSON.stringify(theConv, null, 4);
-					$('[data-conversation-id="' + conversationReadableId + '"]').text(theConv);
-				}
-
-				save.doc();
-
-			}
-		});
-		*/
-
 		return false;
-
 	};
-
-
-
 }).call(this)

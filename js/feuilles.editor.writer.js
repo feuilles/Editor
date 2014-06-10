@@ -50,6 +50,34 @@
 		//
 		document.addEventListener("keydown", function(e) {
 			//
+			// Always make sure that at least one node
+			// is present. If the user does some
+			// cmd+a moves, we may lose
+			// all our nodes, due to the contenteditable
+			// nature of the editor (nodes can actually be
+			// deleted by the user).
+			//
+			setTimeout(function() {
+				var nodes = $("#the-editor").find('[data-editor="token"]');
+
+				if (!nodes.length) {
+					var content = $theEditor.html();
+					content = editor.util.makeContent(content);
+					$theEditor.html(content);
+
+					var last = $('[data-editor="token"]').last()[0];
+
+					var range = document.createRange();
+					var sel = window.getSelection();
+					range.setStart(last, 1);
+					range.setEnd(last, 1);
+
+					sel.removeAllRanges();
+					sel.addRange(range);
+				}
+			}, 1);
+
+			//
 			// Get our target node.
 			// e.target doesn't work as expected
 			// in contenteditable contexts.
@@ -73,6 +101,7 @@
 
 		}, false);
 
+
 		//
 		// Handle the "enter" key in
 		// contenteditable contexts.
@@ -87,6 +116,15 @@
 		//
 		kDown.whenDown("backspace", function(e) {
 			self.on.backspace(e);
+		});
+
+		//
+		// Handle pasted content
+		//
+		$("body").on("paste", function(e) {
+			setTimeout(function() {
+				self.on.paste(e);
+			}, 1);
 		});
 
 		//
@@ -427,6 +465,30 @@
 			var node = $node[0];
 
 			//
+			// The scenario where a user does
+			// cmd+a and then presses enter.
+			// We are going to create two new nodes.
+			//
+			if (!node) {
+				setTimeout(function() {
+					var html = "";
+					html += '<div data-editor="token" data-token="p" data-empty="true"></div>';
+					html += '<div data-editor="token" data-token="p" data-empty="true"></div>';
+					$("#the-editor").html(html);
+					$('[data-editor="token"]').each(function() {
+						$this = $(this);
+						$this.html(editor.util.noBr($this.html()));
+					});
+
+					var last = $('[data-editor="token"]').last()[0];
+
+					editor.util.focus(last);
+
+					return;
+				}, 1);
+			}
+
+			//
 			// We're about to create a new node.
 			// We first split the current node
 			// at caret position.
@@ -519,11 +581,28 @@
 		}
 		var node = $node[0];
 
+
 		//
-		// We only want to work in specific nodes
+		// The scenario where a user does
+		// cmd+a and then presses backspace.
+		// We are going to create one "base" node.
 		//
-		if (!$node.attr("data-token")) {
-			return;
+		if (!node) {
+			setTimeout(function() {
+				var html = "";
+				html += '<div data-editor="token" data-token="p" data-empty="true"></div>';
+				$("#the-editor").html(html);
+				$('[data-editor="token"]').each(function() {
+					$this = $(this);
+					$this.html(editor.util.noBr($this.html()));
+				});
+
+				var last = $('[data-editor="token"]').last()[0];
+
+				editor.util.focus(last);
+
+				return;
+			}, 1);
 		}
 
 		//
@@ -533,9 +612,9 @@
 		var nodeContent = editor.util.noBr($node.html());
 
 		var firstTextNode = editor.util.firstTextNode(node);
-		if (!firstTextNode &&  nodeContent === "") {
+		if (!firstTextNode && nodeContent === "") {
 			firstTextNode = sel.focusNode;
-		} 
+		}
 
 		//
 		// First node scenario
@@ -588,9 +667,9 @@
 		var nodeContent = editor.util.noBr($node.html());
 
 		var firstTextNode = editor.util.firstTextNode(node);
-		if (!firstTextNode &&  nodeContent === "") {
+		if (!firstTextNode && nodeContent === "") {
 			firstTextNode = sel.focusNode;
-		} 
+		}
 
 		var deleteNode = (firstTextNode === sel.focusNode && sel.focusOffset <= 1);
 		if (!deleteNode) {
@@ -615,6 +694,92 @@
 		$prev.attr("data-empty", "false");
 		$node.remove();
 		editor.util.focus($prev[0]);
+
+	};
+
+	/**
+	 *
+	 * Handle the "paste" event
+	 * This method is–and should always be–
+	 * called from setTimeout (1 mill is enough).
+	 * That's to be able to catch the pasted
+	 * content.
+	 *
+	 */
+	editor.writer.on.paste = function(e) {
+		//
+		// Get the target
+		//
+		$target = $(e.target);
+
+		//
+		// Paste inside of a node, or directly
+		// inside the editor (after a cmd+v, for example)
+		//
+		if ($target.attr("data-editor") === "token" ||  $target.attr("data-feuilles-write") === "multiline") {
+			e.preventDefault();
+
+			//
+			// Get a "node" instance. Either
+			// the caret is already in a node, or
+			// we get the closest instance.
+			//
+			var sel = window.getSelection();
+			var $node = $(sel.focusNode);
+			if (!$node.attr("data-token")) {
+				$node = $node.closest('[data-editor="token"]');
+			}
+
+			var node = $node[0];
+
+			setTimeout(function() {
+				//
+				// Browsers add <br> instead of
+				// preserving \n. Let's put things 
+				// back as we want them.
+				//
+				var content = $node.html();
+				content = content.replace(/<br>/g, "\n");
+				content = editor.util.makeContent(content);
+
+
+
+				var container = document.createElement("div");
+				var $container = $(container);
+				$container.html(content);
+
+				var $lastInserted;
+
+				$container.find('[data-editor="token"]').each(function(){
+					if (!$lastInserted) {
+						$node.after(this);
+					} else {
+						$lastInserted.after(this);
+					}
+
+					$lastInserted = $(this);
+				});
+
+				$node.remove();
+
+				//
+				// Set focus
+				//
+				var last = $lastInserted[0];
+
+				var range = document.createRange();
+				var sel = window.getSelection();
+				range.setStart(last, 1);
+				range.setEnd(last, 1);
+
+				sel.removeAllRanges();
+				sel.addRange(range);
+
+				var top = $lastInserted.offset().top;
+				$(window).scrollTop(top);
+
+			}, 1);
+		}
 
 	};
 

@@ -1,6 +1,6 @@
-# feuilles.editor.js 
+# feuilles.editor.js v0.1.0
 
-Here's the JS engine that powers [Feuilles](https://feuill.es)' editor. It's dirty. It's not refactored. But here it is. Brutally.
+Here's the JS engine that powers [Feuilles](https://feuill.es)' editor.
 
 
 ## A Note
@@ -60,21 +60,14 @@ Feel free to suggest new libraries.
 
 ## Empathy
 
-I'm rather a perfectionist. In an effort to ship and move forward, I have uploaded portions of code that I find utterly embarrassing. In fact, “awful” would be a more appropriate way to put it. I could have refactored it to death to prove you that I'm a seasoned dev blah blah blah. But that would have taken a long time.
+I'm rather a perfectionist. In an effort to ship and move forward, I have uploaded portions of code that I find quite embarrassing. I could have refactored things to death to prove you that I know my craft blah blah blah. But that would have taken a long time.
 
 So here is our editor, in all its naked truth. If you were born with the ability to produce clean code right away, lucky you. 
 
-## TODO
 
-So many things… But ASAP: 
+## Working On
 
-* Code should be cleaned and refactored
-* Meaningful comments should be added
-
-
-## Bugs
-
-* Erase all the content of the editor (width cmd+a, for example), then start typing something. Boom.
+* Improving pasted content.
 
 
 ## Abstraction

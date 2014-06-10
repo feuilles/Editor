@@ -1,109 +1,172 @@
+/*!
+ * FeuillesEditor (https://github.com/feuilles/Editor)
+ * Copyright 2014 Alex Duloz
+ * Licensed under MIT (https://github.com/feuilles/Editor/blob/gh-pages/LICENSE)
+ */
 (function() {
+
+	/**
+	 *
+	 * forEach shim
+	 *
+	 */
+	var forEach = typeof Array.prototype.forEach === 'function' ? function(arr, fn) {
+			return arr.forEach(fn);
+		} : function(arr, fn) {
+			for (var i = 0; i < arr.length; i++) fn(arr[i]);
+		};
 
 	var self = editor.util = {};
 
 	/**
 	 *
 	 * Turn HTML conversations
-	 * into embedded conversations
+	 * into plain text conversations
 	 *
 	 */
 	editor.util.parseContent = function(content) {
 		//
 		// Remove <br>s
+		// Browsers have  a tendency to add them.
 		//
 		$("br").remove();
 
 		//
-		// Extract the conversations
+		// Extract the conversations from
+		// the content passed to this method.
+		// We create a "container node", then
+		// work on it.
 		//
-		var conv = document.createElement("div");
-		conv.innerHTML = content;
-		$conv = $(conv);
+		// Keep conversations "on the side",
+		// and then inject them at the end of
+		// the doc later.
+		//
+		var container = document.createElement("div");
+		container.innerHTML = content;
+		$container = $(container);
 
-		var $theConv = $conv.find(".embedded-conversation");
+		//
+		// Conversations in the container
+		//
+		var $conv = $container.find(".embedded-conversation");
 
-		if ($theConv.length) {
-
-			var the_convs = "";
-
-			$conv.find($theConv).each(function() {
-				$div = $(this);
-				var divContent = $div.text();
-
-				var refId = $div.attr("data-conversation-id");
-
-				the_convs += "\n\n{conversation id=" + refId + "}" + divContent + "{/conversation}";
+		//
+		// Conversations have been found
+		//
+		if ($conv.length) {
+			//
+			// Turn "DOM" conversations into
+			// strings.
+			//
+			var convContent = "";
+			$container.find($conv).each(function() {
+				$current = $(this);
+				var currentContent = $current.text();
+				var currentId = $current.attr("data-conversation-id");
+				convContent += "\n\n{conversation id=" + currentId + "}" + currentContent + "{/conversation}";
 			});
 		}
 
-		conv.innerHTML = "";
+		//
+		// Reset our HTML
+		//
+		container.innerHTML = "";
 
 		//
-		// Tokens to content
+		// New round of parsing
+		// Nodes to content (we are creating
+		// the string of our document).
 		//
-		var placeHolder = document.createElement("div");
-		placeHolder.innerHTML = content;
-		$placeHolder = $(placeHolder);
+		var container = document.createElement("div");
+		container.innerHTML = content;
+		$container = $(container);
 
+		//
+		// Var holding our content string.
+		//
 		var content = "";
 
+		//
+		// Loop through nodes, and extract strings
+		// to "populate" our content variable.
+		//
 		var first = true;
-		$placeHolder.find('[data-editor="token"]').each(function() {
-			$this = $(this);
-			if ($this.attr("data-token") === "p") {
-				content += (first === true) ? $this.html() : "\n" + $this.html();
+		$container.find('[data-editor="token"]').each(function() {
+			$current = $(this);
+			if ($current.attr("data-token") === "p") {
+				content += (first === true) ? $current.html() : "\n" + $current.html();
 			}
 			first = false;
 		});
 
 		//
+		// New round of parsing.
 		// Transform conversation <span>s into
 		// “semantic”, embedded conversations
 		//
-		var placeHolder = document.createElement("div");
-		placeHolder.innerHTML = content;
-		$placeHolder = $(placeHolder);
+		var container = document.createElement("div");
+		container.innerHTML = content;
+		$container = $(container);
 
-		$placeHolder.find("span").each(function() {
-			$span = $(this);
-			var spanContent = $span.text();
+		//
+		// Loop
+		//
+		$container.find("span").each(function() {
+			$current = $(this);
+			var currentContent = $span.text();
 
-			var refId = $span.attr("data-ref-for");
+			var currentId = $span.attr("data-ref-for");
 
 			//
 			// If span is empty, it's a deleted conversation.
 			// We remove it.
 			//
-			if ($.trim(spanContent) === "") {
+			if ($.trim(currentContent) === "") {
 				$span.remove();
-				// Remove related conv div
-				$('[data-conversation-id="' + refId + '"]').remove();
+				//
+				// We also remove related 
+				// conv div.
+				//
+				$('[data-conversation-id="' + currentId + '"]').remove();
 				return;
 			}
 
-			spanContent = "{ref for=" + refId + "}" + spanContent + "{/ref}";
+			//
+			// Wrap the ref with accurate "tags"
+			//
+			currentContent = "{ref for=" + currentId + "}" + currentContent + "{/ref}";
 
-			var txt = document.createTextNode(spanContent);
+			//
+			// Create a text node, inject it before the span
+			// then remove the span.
+			//
+			var txt = document.createTextNode(currentContent);
 			$span.before(txt);
 			$span.remove();
 
 		});
 
-		var the_convs = the_convs || "";
-		return $placeHolder.text() + the_convs;
+		//
+		// Conversation or not?
+		// If not, empty string
+		//
+		var convContent = convContent || "";
+
+		//
+		// Return our container's content and
+		// append conversations (if any).
+		//
+		return $container.text() + convContent;
 	};
 
 
 	/**
 	 *
-	 * This is where we translate our raw content
-	 * into an editor, HTML-ish, rich content
+	 * Turn plain text documents in
+	 * HTML documents.
 	 *
 	 */
 	editor.util.makeContent = function(content) {
-		
-		// console.log(content);
 
 		//
 		// Highlight refs
@@ -111,44 +174,54 @@
 		content = content.replace(/{ref for=([\s\S]*?)}([\s\S]*?){\/ref}/g, '<span class="conversation-highlight" data-ref-for="$1">$2</span>', content);
 
 		//
-		// Hide embedded conversations
+		// Hide embedded conversations:
+		// First, store them, then simply
+		// wipe them.
 		//
-		//content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, '<div class="embedded-conversation" style="display:none;" data-conversation-id="$1">$2<\/div>');
-		var conv = content.match(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g);
-		content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, "");
+		var conv = content.match(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g); // store
+		content = content.replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, ""); // wipe
 
-		var br = content.split(/(?:\r\n|\r|\n)/g);
+		//
+		// Line breaks to nodes
+		//
+		var breaks = content.split(/(?:\r\n|\r|\n)/g);
 
-		if (br) {
-			var lineByLine = "";
-			for (var j = 0; j < br.length; j++) {
-				if ($.trim(br[j]) === "") {
-					lineByLine += '<div data-editor="token" data-token="p" data-empty="true"></div>';
+		//console.log(breaks);
+
+		if (breaks) {
+			var lineContent = "";
+			for (var j = 0; j < breaks.length; j++) {
+				if ($.trim(breaks[j]) === "") {
+					lineContent += '<div data-editor="token" data-token="p" data-empty="true"></div>';
 				} else {
-					lineByLine += '<div data-editor="token" data-token="p">' + br[j] + "</div>";
+					lineContent += '<div data-editor="token" data-token="p">' + breaks[j] + "</div>";
 				}
-
-				content = lineByLine;
-
 			};
+
+			content = lineContent;
+
 		} else {
 			content = '<div data-editor="token" data-token="p">' + content + '</div>';
 		}
 
+		//
+		// If we have conversations, append
+		// them to our content.
+		//
 		if (conv) {
 			for (var i = 0; i < conv.length; i++) {
 				content += conv[i].replace(/{conversation id=([\s\S]*?)}([\s\S]*?){\/conversation}/g, '\n\n<div class="embedded-conversation" style="display:none;" data-conversation-id="$1">$2<\/div>');
-				//content += conv[i]
 			};
 		}
 
-		//console.log(content);
-
-		$('[data-feuilles-write="multiline"]').html(content);
+		return content;
 	};
 
-
-	// http: //stackoverflow.com/questions/7781963/js-get-array-of-all-selected-nodes-in-contenteditable-div
+	/**
+	 *
+	 * http: //stackoverflow.com/questions/7781963/js-get-array-of-all-selected-nodes-in-contenteditable-div
+	 *
+	 */
 	editor.util.nextNode = function(node) {
 		if (node.hasChildNodes()) {
 			return node.firstChild;
@@ -163,7 +236,11 @@
 		}
 	};
 
-	// http://stackoverflow.com/questions/7781963/js-get-array-of-all-selected-nodes-in-contenteditable-div
+	/**
+	 *
+	 * http: //stackoverflow.com/questions/7781963/js-get-array-of-all-selected-nodes-in-contenteditable-div
+	 *
+	 */
 	editor.util.getRangeSelectedNodes = function(range) {
 		var node = range.startContainer;
 		var endNode = range.endContainer;
@@ -189,7 +266,11 @@
 		return rangeNodes;
 	};
 
-	// http://stackoverflow.com/questions/7781963/js-get-array-of-all-selected-nodes-in-contenteditable-div
+	/**
+	 *
+	 * http: //stackoverflow.com/questions/7781963/js-get-array-of-all-selected-nodes-in-contenteditable-div
+	 *
+	 */
 	editor.util.getSelectedNodes = function() {
 		if (window.getSelection) {
 			var sel = window.getSelection();
@@ -200,6 +281,11 @@
 		return [];
 	};
 
+	/**
+	 *
+	 * Set the caret at a given position
+	 *
+	 */
 	editor.util.setCaretAt = function(el, pos) {
 		var range = document.createRange();
 		var sel = window.getSelection();
@@ -209,6 +295,11 @@
 		sel.addRange(range);
 	};
 
+	/**
+	 *
+	 * Find the first text node of an element
+	 *
+	 */
 	editor.util.firstTextNode = function(el) {
 		if (!el) {
 			return false;
@@ -219,6 +310,11 @@
 		return el;
 	};
 
+	/**
+	 *
+	 * Find the last text node of an element
+	 *
+	 */
 	editor.util.lastTextNode = function(el) {
 		if (!el) {
 			return false;
@@ -229,10 +325,24 @@
 		return el;
 	};
 
+	/**
+	 *
+	 * Remove <br>s
+	 *
+	 */
 	editor.util.noBr = function(input) {
+		if (!input) {
+			return "";
+		}
 		return input.replace(/<br>/g, "");
 	};
 
+	/**
+	 *
+	 * Split content into two pieces
+	 * using a unique string
+	 *
+	 */
 	editor.util.contentToPieces = function(el) {
 		$el = $(el);
 		var unique = "___" + self.now() + "___";
@@ -240,9 +350,12 @@
 		return $el.html().split(unique);
 	};
 
-
+	/**
+	 *
+	 * Paste content at the caret current position
+	 *
+	 */
 	editor.util.paste = function(content, highlight) {
-
 		var sel = window.getSelection();
 		var range = sel.getRangeAt(0);
 		range.deleteContents();
@@ -274,7 +387,6 @@
 			} else {
 				range.collapse(true);
 			}
-
 			sel.removeAllRanges();
 			sel.addRange(range);
 		}
@@ -283,18 +395,25 @@
 			firstNode: firstNode,
 			lastNode: lastNode
 		}
-
 	};
 
-	// From underscore.js
+	/**
+	 *
+	 * From underscore.js
+	 * Get a timestamp.
+	 *
+	 */
 	editor.util.now = Date.now || function() {
 		return new Date().getTime();
 	};
 
+	/**
+	 *
+	 * Set focus on an element in a
+	 * contenteditable context
+	 *
+	 */
 	editor.util.focus = function(el) {
-
-
-
 		// In some cases, we may just have a <br>, 
 		// added by the browser, which will cause a bug.
 		el.innerHTML = self.noBr(el.innerHTML);
@@ -310,7 +429,6 @@
 			sel.removeAllRanges();
 			sel.addRange(range);
 		}
-
 
 		if (isEmpty) {
 			el.innerHTML = '\u00a0';
@@ -336,6 +454,10 @@
 		return;
 	};
 
+	/**
+	 *
+	 * A readable UTC date.
+	 */
 	editor.util.moment = function() {
 		var months = [
 			"January",
@@ -361,7 +483,69 @@
 		var minutes = d.getMinutes();
 		var seconds = d.getSeconds();
 		return day + "-" + months[month] + "-" + year + " " + hours + ":" + minutes + ":" + seconds;
-
 	};
+
+	/**
+	 *
+	 * From underscore.js
+	 *
+	 */
+	editor.util.invert = function(obj) {
+		var result = {};
+		for (var prop in obj) {
+			if (!obj.hasOwnProperty(prop)) {
+				continue;
+			}
+			result[obj[prop]] = prop;
+		}
+		return result;
+	};
+
+	/**
+	 *
+	 * From underscore.js
+	 *
+	 */
+	editor.util.keys = function(obj) {
+		var keys = [];
+		for (var key in obj) {
+			keys.push(key);
+		}
+		return keys;
+	};
+
+	/**
+	 *
+	 * From underscore.js
+	 * escape & unescape
+	 *
+	 */
+	var entityMap = {
+		escape: {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#x27;'
+		}
+	};
+	entityMap.unescape = editor.util.invert(entityMap.escape);
+
+
+	var entityRegexes = {
+		escape: new RegExp('[' + editor.util.keys(entityMap.escape).join('') + ']', 'g'),
+		unescape: new RegExp('(' + editor.util.keys(entityMap.unescape).join('|') + ')', 'g')
+	};
+
+	forEach(['escape', 'unescape'], function(method) {
+		editor.util[method] = function(input) {
+			if (!input) {
+				return "";
+			}
+			return ("" + input).replace(entityRegexes[method], function(match) {
+				return entityMap[method][match];
+			});
+		};
+	});
 
 }).call(this);

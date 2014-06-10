@@ -98,22 +98,22 @@
 	border: 1px solid transparent;
 }
 
-.show-conversations-highlights .conversation-highlight {
+.show-conversations .conversation-highlight {
 	background: #eee;
 	border-radius: 3px;
 	border: 1px solid #ccc;
 }
 
-.show-conversations-highlights .conversation-highlighted {
+.show-conversations .conversation-highlighted {
 	background: #FFE867;
 	border: 1px solid orange;	
 }
 
-.show-conversations-pane .menu {
+.show-conversations .menu {
 	margin-top: 30px;
 }
 
-.show-conversations-highlights .menu {
+.show-conversations .menu {
 	margin-top: 0;
 }
 
