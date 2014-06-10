@@ -113,16 +113,16 @@
 		//
 		$container.find("span").each(function() {
 			$current = $(this);
-			var currentContent = $span.text();
+			var currentContent = $current.text();
 
-			var currentId = $span.attr("data-ref-for");
+			var currentId = $current.attr("data-ref-for");
 
 			//
 			// If span is empty, it's a deleted conversation.
 			// We remove it.
 			//
 			if ($.trim(currentContent) === "") {
-				$span.remove();
+				$current.remove();
 				//
 				// We also remove related 
 				// conv div.
@@ -141,8 +141,8 @@
 			// then remove the span.
 			//
 			var txt = document.createTextNode(currentContent);
-			$span.before(txt);
-			$span.remove();
+			$current.before(txt);
+			$current.remove();
 
 		});
 

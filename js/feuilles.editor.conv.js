@@ -530,6 +530,9 @@ Hello, I am a text and this is cool. {ref for=alexduloz 22-June-2014 17:08:46}I 
 		} catch (e) {
 			ok = false;
 		}
+
+		console.log(conv);
+
 		$("#conversation-reference").text(reference);
 
 		var div = document.createElement("div");
@@ -549,7 +552,7 @@ Hello, I am a text and this is cool. {ref for=alexduloz 22-June-2014 17:08:46}I 
 				$div.find(".conversation-content").text(conv[i].content);
 				$div.find(".conversation-nicedate").text(conv[i].date);
 
-				$container.append($div.html());
+				$conversationItems.append($div.html());
 			};
 		}
 
